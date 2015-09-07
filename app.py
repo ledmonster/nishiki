@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import datetime
 import json
 import os
 
@@ -15,11 +16,12 @@ TOKEN = os.environ['SLACK_TOKEN']
 
 CONTEXT = None
 MODE = None
+LAST_ACCESS = datetime.datetime.now()
 
 
 @app.route('/', methods=['POST'])
 def main():
-    global MODE, CONTEXT
+    global MODE, CONTEXT, LAST_ACCESS
 
     if request.form['token'] != TOKEN:
         abort(401)
@@ -34,10 +36,14 @@ def main():
         'place': '東京',
         # 't': 20,
     }
-    if CONTEXT is not None:
-        api_req['context'] = CONTEXT
-    if MODE is not None:
-        api_req['mode'] = MODE
+
+    # 前回のアクセスが3分以内の場合のみ、コンテキストを保持
+    now = datetime.datetime.now()
+    if now < LAST_ACCESS + datetime.timedelta(seconds=180):
+        if CONTEXT is not None:
+            api_req['context'] = CONTEXT
+        if MODE is not None:
+            api_req['mode'] = MODE
 
     r = requests.post(
         API_URL,
@@ -48,6 +54,7 @@ def main():
     # global 変数を上書き
     MODE = ret['mode']
     CONTEXT = ret['context']
+    LAST_ACCESS = now
 
     return jsonify(text="{}: {}".format(user_name, ret['utt']))
 
